@@ -1,0 +1,65 @@
+操作步骤
+
+1.idp端
+keystone-manage saml_idp_metadata > keystone_idp_metadata.xml
+
+service apache2 restart
+
+创建sp
+curl -s -X PUT -H "X-Auth-Token: gAAAAABX4PGmxl3reBHKDYP8QijZ3407xEQfk8_GTGL8TkYrjJyesFHjRhYq2AF1kmw27xTlsetOdEcXQMWnlddoAgnf0_1r0u-nJZjID2xsuqOnnQeK9kquDJdKf42kgO4QcvwgdsJili3bxXVeNXfeMZ4SpjtpYhrnc8SZlRJV_dH4eYB0BrE" \
+    -H "Content-Type: application/json" \
+    -d '{"service_provider": {"auth_url": "http://192.168.139.41:5000/v3/OS-FEDERATION/identity_providers/beta/protocols/saml2/auth", "sp_url": "http://192.168.139.41:5000/Shibboleth.sso/SAML2/ECP", "enabled": true}}' \
+    http://192.168.139.63:5000/v3/OS-FEDERATION/service_providers/keystone-sp
+
+获取metadata
+curl -i -X POST -H "Content-Type:application/json" \
+    http://192.168.139.63:5000/v3/auth/OS-FEDERATION/saml2/ecp \
+    -d '{"auth": {"scope": {"service_provider": {"id": "keystone-sp"}}, "identity": {"token": {"id": "gAAAAABX4evRxwovAPVFh7dHS2KPyA3SgkB9tbxDO7_L7BJjzbOkSHnNdvriw2Gr2d9C38fSZ6EsM_o0e66jwaoqBk8wRlEuMBh9idnBXUwXkazH-pZZJ5a-ZR2MPH1P4zdP3zaDhJDKZLKoi3dLSExGEpwb03T4fgQw4R5ZqboYsFhY7ICFHs0"}, "methods":["token"]}}}'
+
+2.sp端
+
+shib-keygen -f
+service apache2 restart
+
+创建group
+openstack group create --domain default openstack_group
+
+创建mapping
+curl -g -i -X PUT http://192.168.139.41:35357/v3/OS-FEDERATION/mappings/map_1 \
+    -H "Content-Type: application/json" -H "Accept:application/json" \
+    -H "X-Auth-Token: gAAAAABX4e2pTfnjkNXHr8wBHKa6-82H6KOt-nyxTyT42kI5Id_GnPmSY28jlAj2Br1lsWS7DrV2Ijn52McC1qPgoV5NnxuB17IKuD_wsDWLxvh3XAgwlx5s8nucJsWQtLgo6swIPaM180cSO34HkxAih6sRRToiW_4er-F_Jy9Qk-OMF-0Kpqc" \
+    -d '{"mapping":{"rules": [{"local": [{"user": {"name":"{0}"}, "group": {"id":"7f116c1b997b42a8bdf6ae3bd7909a2d"}}],"remote":[{"type": "openstack_user"}, {"type":"OTC_INTEL_GROUPIDS"}]}]}}'
+
+创建Protocols
+curl -g -i -X PUT http://192.168.139.41:35357/v3/OS-FEDERATION/identity_providers/keystone-idp/protocols/saml2 \
+    -H "Content-Type: application/json" -H "Accept:application/json" \
+    -H "X-Auth-Token: gAAAAABX4e2pTfnjkNXHr8wBHKa6-82H6KOt-nyxTyT42kI5Id_GnPmSY28jlAj2Br1lsWS7DrV2Ijn52McC1qPgoV5NnxuB17IKuD_wsDWLxvh3XAgwlx5s8nucJsWQtLgo6swIPaM180cSO34HkxAih6sRRToiW_4er-F_Jy9Qk-OMF-0Kpqc" \
+    -d '{"protocol":{"mapping_id": "map_1"}}'
+
+
+3.测试federation
+
+python k-k-federation.py
+
+出现如下的错误：
+
+Traceback (most recent call last):
+  File "/root/k-k-federation.py", line 113, in <module>
+    main()
+  File "/root/k-k-federation.py", line 108, in main
+    client.exchange_assertion()
+  File "/root/k-k-federation.py", line 87, in exchange_assertion
+    redirect=False)
+  File "/usr/lib/python2.7/dist-packages/keystoneclient/session.py", line 520, in post
+    return self.request(url, 'POST', **kwargs)
+  File "/usr/lib/python2.7/dist-packages/positional/__init__.py", line 94, in inner
+    return func(*args, **kwargs)
+  File "/usr/lib/python2.7/dist-packages/keystoneclient/session.py", line 420, in request
+    raise exceptions.from_response(resp, method, url)
+keystoneauth1.exceptions.http.InternalServerError: Internal Server Error (HTTP 500)
+
+
+在sp端，查看日志，有如下的错误
+
+Sep 21 11:03:34 gs-ubuntu1 apache2: 1474427014 ERROR Shibboleth.Listener [13462] shib_handler: remoted message returned an error: Unable to establish security of incoming assertion.
+Sep 21 11:03:34 gs-ubuntu1 apache2: 1474427014 ERROR Shibboleth.Apache [13462] shib_handler: Unable to establish security of incoming assertion.
