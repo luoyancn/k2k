@@ -30,6 +30,10 @@ service apache2 restart
 创建group
 openstack group create --domain default openstack_group
 
+创建idp
+openstack identity provider  create keystone-idp \
+    --remote-id http://192.168.139.63:5000/v3/OS-FEDERATION/saml2/idp
+
 创建mapping
 curl -g -i -X PUT http://192.168.139.41:35357/v3/OS-FEDERATION/mappings/map_1 \
     -H "Content-Type: application/json" -H "Accept:application/json" \
