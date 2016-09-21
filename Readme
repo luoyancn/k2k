@@ -1,5 +1,11 @@
 操作步骤
 
+环境情况：
+idp：192.168.139.63
+sp：192.168.139.41
+keystone版本：Mitaka
+操作系统：Ubuntu 14.04.4 LTS (GNU/Linux 3.19.0-61-generic x86_64)
+
 1.idp端
 keystone-manage saml_idp_metadata > keystone_idp_metadata.xml
 
